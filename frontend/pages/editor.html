@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Floor Plan Editor – NavMap</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+body{overflow:hidden}
+.editor-wrap{display:flex;flex-direction:column;height:calc(100vh - 65px)}
+
+/* Toolbar */
+.editor-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;
+  background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.editor-bar-title{font-family:'Syne',sans-serif;font-weight:700;margin-right:auto;font-size:.92rem;white-space:nowrap}
+.tool-hint{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);
+  color:var(--accent);padding:5px 11px;border-radius:7px;font-size:.73rem;white-space:nowrap}
+.tool-hint.entrance-hint{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.25);color:var(--accent3)}
+
+/* Tool buttons */
+.tool-btn{border:none;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-weight:600;font-size:.8rem;padding:7px 13px;transition:all .2s;
+  display:inline-flex;align-items:center;gap:5px}
+.tool-btn.view  {background:var(--bg3);color:var(--text2)}
+.tool-btn.pin   {background:var(--bg3);color:var(--text2)}
+.tool-btn.entrance{background:var(--bg3);color:var(--text2)}
+.tool-btn.active-view     {background:var(--accent);color:#0b0c10}
+.tool-btn.active-pin      {background:var(--accent);color:#0b0c10}
+.tool-btn.active-entrance {background:#f59e0b;color:#0b0c10}
+
+/* Body */
+.editor-body{display:flex;flex:1;overflow:hidden}
+
+/* Canvas */
+.canvas-area{flex:1;position:relative;overflow:auto;background:#0d1117;
+  display:flex;align-items:center;justify-content:center}
+#img-wrapper{position:relative;display:inline-block;line-height:0;flex-shrink:0}
+#map-img{display:block;max-width:100%;max-height:calc(100vh - 130px);
+  object-fit:contain;user-select:none}
+.click-layer{position:absolute;inset:0;z-index:5}
+.click-layer.pin-mode      {cursor:crosshair}
+.click-layer.entrance-mode {cursor:cell}
+.click-layer.view-mode     {cursor:default}
+
+/* Pins */
+.e-pin{position:absolute;transform:translate(-50%,-100%);z-index:10;cursor:pointer}
+.e-pin:hover .pin-body{transform:rotate(-45deg) scale(1.15)}
+.pin-body{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 10px rgba(0,0,0,.5);border:2px solid #fff;transition:transform .15s}
+.pin-body span{transform:rotate(45deg);display:block;font-size:13px}
+.pin-lbl{background:rgba(0,0,0,.82);color:#fff;padding:2px 7px;border-radius:5px;
+  font-size:9px;white-space:nowrap;position:absolute;top:-26px;left:50%;transform:translateX(-50%)}
+
+/* Entrance pin special style */
+.entrance-pin-el .pin-body{background:#f59e0b !important;border-color:#fff;
+  box-shadow:0 0 0 3px rgba(245,158,11,.3),0 3px 10px rgba(0,0,0,.5)}
+
+/* Side panel */
+.panel{width:270px;background:var(--card);border-left:1px solid var(--border);
+  padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+.panel-section{border-top:1px solid var(--border);padding-top:10px;margin-top:2px}
+.panel-sec-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;
+  margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.pin-chip{background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;display:flex;align-items:center;gap:7px;font-size:.8rem}
+.pin-chip-del{margin-left:auto;background:none;border:none;
+  color:var(--danger);cursor:pointer;padding:2px 5px;font-size:.85rem}
+.tip-box{background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.15);
+  border-radius:8px;padding:9px 11px;font-size:.73rem;color:var(--accent);line-height:1.5}
+.entrance-box{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);
+  border-radius:8px;padding:10px 12px;font-size:.8rem}
+.entrance-box strong{display:block;margin-bottom:2px}
+.entrance-box span{color:var(--text2);font-size:.73rem}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="logo" href="/"><span class="logo-hex">⬡</span> NavMap</a>
+  <div class="nav-right">
+    <button class="btn btn-ghost btn-sm" onclick="window.location.href='/dashboard'">← Dashboard</button>
+  </div>
+</nav>
+
+<div class="editor-wrap">
+  <!-- Toolbar -->
+  <div class="editor-bar">
+    <span class="editor-bar-title" id="editor-title">Loading…</span>
+    <span class="tool-hint" id="tool-hint">Select a tool and click on the map</span>
+    <!-- Tool buttons -->
+    <button class="tool-btn view" id="btn-view"     onclick="setTool('view')">🖐 View</button>
+    <button class="tool-btn pin active-pin" id="btn-pin" onclick="setTool('pin')">📍 Add Pin</button>
+    <button class="tool-btn entrance" id="btn-entrance" onclick="setTool('entrance')">🚪 Set Entrance</button>
+  </div>
+
+  <div class="editor-body">
+    <!-- Canvas -->
+    <div class="canvas-area">
+      <div id="img-wrapper">
+        <img id="map-img" src="" alt="Floor Plan"/>
+        <div class="click-layer pin-mode" id="click-layer" onclick="onMapClick(event)"></div>
+        <div id="pins-layer"></div>
+      </div>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="panel">
+
+      <!-- Entrance Gate Status -->
+      <div>
+        <div class="panel-sec-title">🚪 Entrance Gate</div>
+        <div id="entrance-status">
+          <div class="entrance-box" style="background:rgba(255,255,255,.04);border-color:var(--border)">
+            <strong style="color:var(--text2)">Not placed yet</strong>
+            <span>Switch to "Set Entrance" mode and click on the image to place it</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Room Markers -->
+      <div class="panel-section">
+        <div class="panel-sec-title">
+          📍 Room Markers
+          <span class="badge bg-green" id="pin-count">0</span>
+        </div>
+        <div id="pin-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+
+        <!-- Quick add form -->
+        <div style="background:var(--bg3);border-radius:8px;padding:10px;margin-top:4px">
+          <div style="font-size:.75rem;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Quick Add</div>
+          <div class="form-group" style="margin-bottom:7px">
+            <label>Name</label>
+            <input class="form-control" id="q-label" placeholder="e.g. Computer Lab 1"/>
+          </div>
+          <div class="form-group" style="margin-bottom:7px">
+            <label>Category</label>
+            <select class="form-control" id="q-cat">
+              <option>Classroom</option><option>Laboratory</option><option>Department</option>
+              <option>Office</option><option>Facility</option><option>Washroom</option>
+              <option>Canteen</option><option>Library</option><option>Emergency</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:8px">
+            <label>Icon</label>
+            <select class="form-control" id="q-icon">
+              <option value="🏫">🏫 Classroom</option><option value="🖥️">🖥️ Computer</option>
+              <option value="🧪">🧪 Lab</option><option value="📚">📚 Library</option>
+              <option value="🍽️">🍽️ Canteen</option><option value="🚻">🚻 Washroom</option>
+              <option value="🏢">🏢 Office</option><option value="🔬">🔬 Science</option>
+              <option value="⚙️">⚙️ Workshop</option><option value="🎓">🎓 Hall</option>
+              <option value="💊">💊 Medical</option><option value="🔒">🔒 Security</option>
+              <option value="📍">📍 General</option>
+            </select>
+          </div>
+          <button class="btn btn-primary w100" onclick="addCenterPin()" style="font-size:.8rem">+ Add at Center</button>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        💡 <strong>Add Pin</strong> mode: click map to place room<br/>
+        🚪 <strong>Set Entrance</strong> mode: click map to place entrance gate (only one per organization)
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Room Pin Modal -->
+<div class="modal-bg" id="pin-modal">
+  <div class="modal" style="max-width:370px">
+    <button class="modal-close" onclick="closeModal('pin-modal')">✕</button>
+    <h3>📍 Add Room Marker</h3>
+    <div class="form-group"><label>Name / Label</label>
+      <input class="form-control" id="m-label" placeholder="e.g. Computer Lab 1"/>
+    </div>
+    <div class="form-group"><label>Category</label>
+      <select class="form-control" id="m-cat">
+        <option>Classroom</option><option>Laboratory</option><option>Department</option>
+        <option>Office</option><option>Facility</option><option>Washroom</option>
+        <option>Canteen</option><option>Library</option><option>Emergency</option><option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Icon</label>
+      <select class="form-control" id="m-icon">
+        <option value="🏫">🏫 Classroom</option><option value="🖥️">🖥️ Computer</option>
+        <option value="🧪">🧪 Lab</option><option value="📚">📚 Library</option>
+        <option value="🍽️">🍽️ Canteen</option><option value="🚻">🚻 Washroom</option>
+        <option value="🏢">🏢 Office</option><option value="🔬">🔬 Science</option>
+        <option value="⚙️">⚙️ Workshop</option><option value="🎓">🎓 Hall</option>
+        <option value="💊">💊 Medical</option><option value="🔒">🔒 Security</option>
+        <option value="📍">📍 General</option>
+      </select>
+    </div>
+    <button class="btn btn-primary w100" onclick="confirmPin()">Place Marker</button>
+  </div>
+</div>
+
+<!-- Entrance Gate Modal -->
+<div class="modal-bg" id="entrance-modal">
+  <div class="modal" style="max-width:370px">
+    <button class="modal-close" onclick="closeModal('entrance-modal')">✕</button>
+    <h3>🚪 Place Entrance Gate</h3>
+    <p style="color:var(--text2);font-size:.82rem;margin-bottom:16px">
+      This is the main entrance for your organization. It will appear on all navigation maps for users.
+      Only <strong>one entrance</strong> exists per organization.
+    </p>
+    <div class="form-group">
+      <label>Entrance Label</label>
+      <input class="form-control" id="ent-label" value="Main Entrance" placeholder="e.g. Main Entrance, Gate A"/>
+    </div>
+    <button class="btn btn-primary w100" onclick="confirmEntrance()" style="background:#f59e0b;color:#0b0c10">
+      🚪 Place Entrance Here
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/js/utils.js"></script>
+<script>
+const auth = getAuth();
+if (!auth.token) window.location.href = '/login';
+
+const params = new URLSearchParams(window.location.search);
+const FP_ID  = params.get('fp');
+if (!FP_ID) window.location.href = '/dashboard';
+
+let markers    = [];
+let entrance   = null;   // current org entrance gate
+let tool       = 'pin';
+let pendingXY  = null;
+let currentFP  = null;   // current floor plan data
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+async function init() {
+  try {
+    const fps = await apiFetch('/floorplans/');
+    currentFP = fps.find(f => f.id === FP_ID);
+    if (!currentFP) { toast('Floor plan not found'); return; }
+
+    document.title = currentFP.name + ' – Editor';
+    document.getElementById('editor-title').textContent =
+      '✏️ ' + currentFP.name + ' — ' + currentFP.floor_label;
+    document.getElementById('map-img').src = currentFP.image_url;
+
+    // Load markers for this floor
+    markers = await apiFetch('/markers/floor/' + FP_ID);
+
+    // Load entrance gate for this org
+    try {
+      const eg = await apiFetch('/navigate/entrance?org_id=' + auth.orgId);
+      entrance = eg && eg.label ? eg : null;
+    } catch(e) { entrance = null; }
+
+    renderPins();
+    renderEntranceStatus();
+    setTool('pin'); // default tool
+  } catch(e) { toast('Error loading: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════
+//  TOOL SWITCHING
+// ══════════════════════════════════════════════
+function setTool(t) {
+  tool = t;
+  const layer = document.getElementById('click-layer');
+  const hint  = document.getElementById('tool-hint');
+
+  // Reset all buttons
+  document.getElementById('btn-view').className     = 'tool-btn view';
+  document.getElementById('btn-pin').className      = 'tool-btn pin';
+  document.getElementById('btn-entrance').className = 'tool-btn entrance';
+
+  if (t === 'pin') {
+    layer.className = 'click-layer pin-mode';
+    hint.className  = 'tool-hint';
+    hint.textContent = '📍 Click on the map image to place a room pin';
+    document.getElementById('btn-pin').className = 'tool-btn pin active-pin';
+  } else if (t === 'entrance') {
+    layer.className = 'click-layer entrance-mode';
+    hint.className  = 'tool-hint entrance-hint';
+    hint.textContent = '🚪 Click on the map image to place the entrance gate';
+    document.getElementById('btn-entrance').className = 'tool-btn entrance active-entrance';
+  } else {
+    layer.className = 'click-layer view-mode';
+    hint.className  = 'tool-hint';
+    hint.textContent = '🖐 View mode — switch tool to place pins';
+    document.getElementById('btn-view').className = 'tool-btn view active-view';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  MAP CLICK — routes to correct handler
+// ══════════════════════════════════════════════
+function onMapClick(e) {
+  const wrapper = document.getElementById('img-wrapper');
+  const rect    = wrapper.getBoundingClientRect();
+  const xPct    = Math.min(Math.max(((e.clientX - rect.left) / rect.width)  * 100, 1), 99);
+  const yPct    = Math.min(Math.max(((e.clientY - rect.top)  / rect.height) * 100, 1), 99);
+  pendingXY     = { xPct, yPct };
+
+  if (tool === 'pin') {
+    // Pre-fill from quick-add panel
+    document.getElementById('m-label').value = document.getElementById('q-label').value;
+    document.getElementById('m-cat').value   = document.getElementById('q-cat').value;
+    document.getElementById('m-icon').value  = document.getElementById('q-icon').value;
+    openModal('pin-modal');
+    setTimeout(() => document.getElementById('m-label').focus(), 100);
+
+  } else if (tool === 'entrance') {
+    // Pre-fill entrance label if already exists
+    if (entrance) {
+      document.getElementById('ent-label').value = entrance.label;
+    }
+    openModal('entrance-modal');
+    setTimeout(() => document.getElementById('ent-label').focus(), 100);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  PLACE ROOM PIN
+// ══════════════════════════════════════════════
+async function confirmPin() {
+  const label = document.getElementById('m-label').value.trim();
+  const cat   = document.getElementById('m-cat').value;
+  const icon  = document.getElementById('m-icon').value;
+  if (!label) return toast('Enter a name for this marker');
+  const { xPct, yPct } = pendingXY || { xPct: 50, yPct: 50 };
+  try {
+    const m = await apiFetch('/markers/', {
+      method: 'POST',
+      body: JSON.stringify({ label, category: cat, icon, xPct, yPct, floorPlanId: FP_ID })
+    });
+    markers.push(m);
+    renderPins();
+    closeModal('pin-modal');
+    document.getElementById('m-label').value = '';
+    toast('✅ ' + label + ' added');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function addCenterPin() {
+  const label = document.getElementById('q-label').value.trim();
+  const cat   = document.getElementById('q-cat').value;
+  const icon  = document.getElementById('q-icon').value;
+  if (!label) return toast('Enter a name first');
+  const xPct = 35 + Math.random() * 30;
+  const yPct = 35 + Math.random() * 30;
+  try {
+    const m = await apiFetch('/markers/', {
+      method: 'POST',
+      body: JSON.stringify({ label, category: cat, icon, xPct, yPct, floorPlanId: FP_ID })
+    });
+    markers.push(m);
+    renderPins();
+    document.getElementById('q-label').value = '';
+    toast('✅ ' + label + ' added');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function removePin(id, label) {
+  if (!confirm('Remove "' + label + '"?')) return;
+  try {
+    await apiFetch('/markers/' + id, { method: 'DELETE' });
+    markers = markers.filter(m => m.id !== id);
+    renderPins();
+    toast('Removed: ' + label);
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════
+//  PLACE ENTRANCE GATE
+// ══════════════════════════════════════════════
+async function confirmEntrance() {
+  const label = document.getElementById('ent-label').value.trim() || 'Main Entrance';
+  const { xPct, yPct } = pendingXY || { xPct: 50, yPct: 90 };
+
+  // Warn if replacing existing entrance
+  if (entrance && !confirm(
+    `Replace existing entrance "${entrance.label}" with new position?\n\nThis will update the entrance gate for your entire organization.`
+  )) return;
+
+  try {
+    await apiFetch('/navigate/entrance', {
+      method: 'POST',
+      body: JSON.stringify({
+        label,
+        floor_plan_id: FP_ID,
+        floor_label:   currentFP.floor_label,
+        floor_name:    currentFP.name,
+        x_pct:         xPct,
+        y_pct:         yPct
+      })
+    });
+    entrance = { label, floor_plan_id: FP_ID, floor_label: currentFP.floor_label,
+                 floor_name: currentFP.name, x_pct: xPct, y_pct: yPct, is_entrance: true };
+    renderPins();
+    renderEntranceStatus();
+    closeModal('entrance-modal');
+    toast('✅ Entrance gate placed: ' + label);
+    // Switch back to pin tool
+    setTool('pin');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function removeEntrance() {
+  if (!confirm('Remove the entrance gate?')) return;
+  try {
+    await apiFetch('/navigate/entrance', { method: 'DELETE' });
+    entrance = null;
+    renderPins();
+    renderEntranceStatus();
+    toast('Entrance gate removed');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════
+//  RENDER ENTRANCE STATUS (panel)
+// ══════════════════════════════════════════════
+function renderEntranceStatus() {
+  const el = document.getElementById('entrance-status');
+  if (!entrance) {
+    el.innerHTML = `
+      <div class="entrance-box" style="background:rgba(255,255,255,.04);border-color:var(--border)">
+        <strong style="color:var(--text2)">Not placed yet</strong>
+        <span>Switch to "Set Entrance" tool and click on the image</span>
+      </div>`;
+    return;
+  }
+  // Show entrance — but only show it if it's on this floor
+  const onThisFloor = entrance.floor_plan_id === FP_ID;
+  el.innerHTML = `
+    <div class="entrance-box">
+      <strong>🚪 ${entrance.label}</strong>
+      <span>${entrance.floor_name} (${entrance.floor_label})${!onThisFloor ? ' — on another floor' : ''}</span>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        ${onThisFloor ? `<button class="btn btn-ghost btn-xs" onclick="setTool('entrance')">📍 Reposition</button>` : ''}
+        <button class="btn btn-danger btn-xs" onclick="removeEntrance()">🗑 Remove</button>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  RENDER ALL PINS ON MAP
+// ══════════════════════════════════════════════
+const CAT_COLORS = {
+  Classroom:'#4ade80', Laboratory:'#38bdf8', Department:'#f59e0b',
+  Office:'#c084fc', Facility:'#f87171', Washroom:'#94a3b8',
+  Canteen:'#fb923c', Library:'#a78bfa', Emergency:'#ef4444', Other:'#6ee7b7'
+};
+
+function renderPins() {
+  const layer = document.getElementById('pins-layer');
+  const list  = document.getElementById('pin-list');
+  const count = document.getElementById('pin-count');
+  count.textContent = markers.length;
+
+  let html = '';
+
+  // ── Entrance pin (only if on this floor) ──
+  if (entrance && entrance.floor_plan_id === FP_ID) {
+    html += `
+      <div class="e-pin entrance-pin-el"
+           style="left:${entrance.x_pct}%;top:${entrance.y_pct}%;position:absolute;transform:translate(-50%,-100%);z-index:20;cursor:pointer"
+           title="🚪 ${entrance.label}" onclick="setTool('entrance');toast('Click on map to reposition entrance')">
+        <div class="pin-lbl">🚪 ${entrance.label}</div>
+        <div class="pin-body" style="background:#f59e0b;width:34px;height:34px;border-radius:50% 50% 50% 0;
+          display:flex;align-items:center;justify-content:center;
+          box-shadow:0 0 0 3px rgba(245,158,11,.3),0 3px 10px rgba(0,0,0,.5);
+          border:2.5px solid #fff;transform:rotate(-45deg)">
+          <span style="transform:rotate(45deg);display:block;font-size:15px">🚪</span>
+        </div>
+      </div>`;
+  }
+
+  // ── Room pins ──
+  html += markers.map(m => {
+    const color = CAT_COLORS[m.category] || '#4ade80';
+    return `
+      <div class="e-pin"
+           style="left:${m.x_pct}%;top:${m.y_pct}%;position:absolute;transform:translate(-50%,-100%);z-index:10;cursor:pointer"
+           title="${m.label}" onclick="removePin('${m.id}','${m.label.replace(/'/g,"\\'")}')">
+        <div class="pin-lbl">${m.label}</div>
+        <div class="pin-body" style="background:${color};width:30px;height:30px;border-radius:50% 50% 50% 0;
+          display:flex;align-items:center;justify-content:center;
+          box-shadow:0 3px 10px rgba(0,0,0,.5);border:2px solid #fff;transform:rotate(-45deg)">
+          <span style="transform:rotate(45deg);display:block;font-size:13px">${m.icon||'📍'}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  layer.innerHTML = html;
+
+  // ── Side panel list ──
+  list.innerHTML = markers.length === 0
+    ? '<div style="color:var(--text2);font-size:.78rem;text-align:center;padding:10px">No pins yet — click map to add</div>'
+    : markers.map(m => `
+        <div class="pin-chip">
+          <span>${m.icon||'📍'}</span>
+          <div>
+            <div style="font-weight:600;font-size:.8rem">${m.label}</div>
+            <div style="font-size:.7rem;color:var(--text2)">${m.category}</div>
+          </div>
+          <button class="pin-chip-del" onclick="removePin('${m.id}','${m.label.replace(/'/g,"\\'")}')">✕</button>
+        </div>
+      `).join('');
+}
+
+init();
+</script>
+</body>
+</html>

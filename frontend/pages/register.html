@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Register – NavMap</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+.auth-wrap {
+  background:
+    radial-gradient(ellipse 60% 40% at 70% 10%, rgba(200,241,53,.07) 0%, transparent 50%),
+    var(--bg);
+}
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-box">
+    <a class="auth-logo" href="/">
+      <div class="logo-mark">N</div> NavMap
+    </a>
+    <h2>Create your account</h2>
+    <p class="auth-sub">Set up indoor navigation for your organization in minutes</p>
+    <div class="err-box" id="err"></div>
+    <div class="form-group">
+      <label>Organization Name</label>
+      <input class="form-control" id="org" placeholder="e.g. City Hospital, Greenfield College"/>
+    </div>
+    <div class="form-group">
+      <label>Organization Type</label>
+      <select class="form-control" id="type">
+        <option value="hospital">🏥 Hospital / Clinic</option>
+        <option value="college">🎓 College / University</option>
+        <option value="mall">🛍️ Shopping Mall</option>
+        <option value="office">🏢 Office / Corporate</option>
+        <option value="factory">🏭 Factory / Industry</option>
+        <option value="other">🏛️ Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input class="form-control" type="email" id="email" placeholder="admin@organization.com"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input class="form-control" type="password" id="pass" placeholder="Min 6 characters"/>
+    </div>
+    <button class="btn btn-primary w100" onclick="doRegister()" style="margin-top:4px">
+      Create Account →
+    </button>
+    <p class="auth-switch" style="margin-top:18px">
+      Already registered? <a href="/login">Login here</a>
+    </p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/js/utils.js"></script>
+<script>
+  if (getAuth().token) window.location.href = '/dashboard';
+  async function doRegister() {
+    document.getElementById('err').style.display = 'none';
+    const org  = document.getElementById('org').value.trim();
+    const type = document.getElementById('type').value;
+    const email= document.getElementById('email').value.trim();
+    const pass = document.getElementById('pass').value;
+    if (!org||!email||!pass) return showErr('err','All fields are required');
+    if (pass.length < 6) return showErr('err','Password must be at least 6 characters');
+    try {
+      const d = await apiFetch('/auth/register',{method:'POST',body:JSON.stringify({orgName:org,orgType:type,email,password:pass})});
+      setAuth(d); window.location.href = '/dashboard';
+    } catch(e) { showErr('err', e.message); }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dashboard – NavMap</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+.entrance-card{background:var(--bg3);border:1px solid rgba(74,222,128,.25);border-radius:var(--radius);padding:18px;margin-bottom:20px}
+.entrance-card h3{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.entrance-card p{color:var(--text2);font-size:.8rem;margin-bottom:12px}
+.entrance-set{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.entrance-info{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:.85rem;flex:1}
+.entrance-info span{color:var(--text2);font-size:.75rem;display:block;margin-top:2px}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="/"><span class="logo-hex">⬡</span> NavMap</a>
+  <div class="nav-right">
+    <span class="nav-org-label" id="org-label"></span>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+  <aside class="sidebar">
+    <div class="sidebar-label">Menu</div>
+    <button class="nav-item active" onclick="switchTab('floors',this)">🗺️ Floor Plans</button>
+    <button class="nav-item" onclick="switchTab('markers',this)">📍 All Markers</button>
+    <button class="nav-item" onclick="switchTab('qr',this)">⬛ QR Codes</button>
+    <button class="nav-item" onclick="switchTab('analytics',this)">📊 Analytics</button>
+    <div class="sidebar-footer" id="sidebar-org"></div>
+  </aside>
+
+  <main class="dash-main">
+
+    <!-- FLOORS TAB -->
+    <div class="dash-tab active" id="tab-floors">
+      <div class="page-hdr">
+        <h2 class="page-title">Floor Plans</h2>
+        <button class="btn btn-primary btn-sm" onclick="openModal('upload-modal')">+ Upload Floor Plan</button>
+      </div>
+      <p class="page-sub">Upload a photo for each floor then click "Edit Pins" to mark rooms.</p>
+
+      <!-- Entrance Gate -->
+      <div class="entrance-card">
+        <h3>🚪 Main Entrance Gate</h3>
+        <p>One entrance gate per organization — appears in navigation for all users.</p>
+        <div class="entrance-set">
+          <div class="entrance-info" id="entrance-info">
+            <strong>Not set yet</strong>
+            <span>Set an entrance gate so users know where to start</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('entrance-modal')">Set Entrance</button>
+          <button class="btn btn-danger btn-sm" id="del-entrance-btn" style="display:none" onclick="deleteEntrance()">Remove</button>
+        </div>
+      </div>
+
+      <div class="grid2" id="floors-grid">
+        <div class="empty-state"><div class="ei">🗺️</div><h3>No floor plans yet</h3><p>Upload your first floor plan to begin.</p></div>
+      </div>
+    </div>
+
+    <!-- MARKERS TAB -->
+    <div class="dash-tab" id="tab-markers">
+      <div class="page-hdr"><h2 class="page-title">All Markers</h2></div>
+      <p class="page-sub">All pinned rooms and locations across all floors.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Label</th><th>Floor</th><th>Category</th><th>Scans</th><th>Actions</th></tr></thead>
+          <tbody id="markers-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text2);padding:28px">No markers yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- QR TAB -->
+    <div class="dash-tab" id="tab-qr">
+      <div class="page-hdr">
+        <h2 class="page-title">QR Codes</h2>
+        <button class="btn btn-ghost btn-sm" onclick="loadQR()">↻ Refresh</button>
+      </div>
+      <p class="page-sub">Print and stick each QR code on the physical location.</p>
+      <div class="qr-grid" id="qr-grid">
+        <div class="empty-state" style="grid-column:1/-1"><div class="ei">⬛</div><h3>No markers yet</h3><p>Add room pins to generate QR codes.</p></div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div class="dash-tab" id="tab-analytics">
+      <div class="page-hdr"><h2 class="page-title">Analytics</h2></div>
+      <p class="page-sub">Real scan data — updates every time a user scans a QR code.</p>
+      <div class="grid4" style="margin-bottom:18px">
+        <div class="stat-card"><div class="stat-num" id="s-scans">0</div><div class="stat-lbl">Total Scans</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-today">0</div><div class="stat-lbl">Today</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-markers">0</div><div class="stat-lbl">Markers</div></div>
+        <div class="stat-card"><div class="stat-num" id="s-floors">0</div><div class="stat-lbl">Floors</div></div>
+      </div>
+      <div class="chart-box" style="margin-bottom:16px">
+        <div class="chart-title">📅 Daily Scans — Last 14 Days</div>
+        <div class="daily-bars" id="daily-bars"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="chart-box"><div class="chart-title">📍 Most Scanned Locations</div><div id="chart-scanned"></div></div>
+        <div class="chart-box"><div class="chart-title">🎯 Top Destinations</div><div id="chart-dest"></div></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">🕐 Recent Scans</div>
+        <div id="recent-logs"><div style="color:var(--text2);font-size:.83rem">No scans recorded yet.</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Upload Floor Plan Modal -->
+<div class="modal-bg" id="upload-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('upload-modal')">✕</button>
+    <h3>Upload Floor Plan</h3>
+    <div class="form-group"><label>Floor Name</label><input class="form-control" id="fp-name" placeholder="e.g. Ground Floor, Block A"/></div>
+    <div class="form-group"><label>Floor Label (Short)</label><input class="form-control" id="fp-label" placeholder="e.g. G, 1F, 2F"/></div>
+    <div class="form-group"><label>Floor Number</label><input class="form-control" type="number" id="fp-num" value="0"/></div>
+    <div class="form-group">
+      <label>Floor Plan Image</label>
+      <input class="form-control" type="file" id="fp-file" accept="image/*" onchange="previewImg(event)"/>
+    </div>
+    <img id="fp-preview" style="width:100%;border-radius:8px;margin-bottom:12px;display:none;max-height:160px;object-fit:contain;background:#101318"/>
+    <button class="btn btn-primary w100" onclick="uploadFloor()">Upload & Save</button>
+  </div>
+</div>
+
+<!-- Entrance Gate Modal -->
+<div class="modal-bg" id="entrance-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('entrance-modal')">✕</button>
+    <h3>🚪 Set Main Entrance Gate</h3>
+    <p style="color:var(--text2);font-size:.83rem;margin-bottom:16px">This entrance appears in all users' navigation as a starting/ending point.</p>
+    <div class="form-group">
+      <label>Entrance Label</label>
+      <input class="form-control" id="ent-label" value="Main Entrance" placeholder="e.g. Main Entrance, Gate A"/>
+    </div>
+    <div class="form-group">
+      <label>Located on Floor</label>
+      <select class="form-control" id="ent-floor"></select>
+    </div>
+    <button class="btn btn-primary w100" onclick="saveEntrance()">Save Entrance Gate</button>
+  </div>
+</div>
+
+<!-- QR View Modal -->
+<div class="modal-bg" id="qr-modal">
+  <div class="modal" style="max-width:360px">
+    <button class="modal-close" onclick="closeModal('qr-modal')">✕</button>
+    <h3 id="qr-modal-title">QR Code</h3>
+    <div style="background:#fff;border-radius:10px;padding:14px;display:flex;justify-content:center;margin-bottom:12px">
+      <img id="qr-modal-img" src="" style="width:200px;height:200px;object-fit:contain"/>
+    </div>
+    <p style="color:var(--text2);font-size:.72rem;word-break:break-all;text-align:center;margin-bottom:14px" id="qr-modal-url"></p>
+    <a id="qr-dl-btn" href="#" class="btn btn-primary w100" download>⬇ Download QR PNG</a>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/js/utils.js"></script>
+<script>
+const auth = getAuth();
+if (!auth.token) window.location.href = '/login';
+document.getElementById('org-label').textContent  = auth.orgName;
+document.getElementById('sidebar-org').textContent = auth.orgName;
+
+let floors = [], allMarkers = [], entranceGate = null;
+
+// ── TAB SWITCH ──────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'markers')   loadMarkers();
+  if (name === 'qr')        loadQR();
+  if (name === 'analytics') loadAnalytics();
+}
+
+// ── FLOORS ──────────────────────────────────────────────────
+async function loadFloors() {
+  try {
+    floors = await apiFetch('/floorplans/');
+    renderFloors();
+    loadEntrance();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function renderFloors() {
+  const g = document.getElementById('floors-grid');
+  if (!floors.length) {
+    g.innerHTML = '<div class="empty-state"><div class="ei">🗺️</div><h3>No floor plans yet</h3><p>Click "Upload Floor Plan" to add your first floor.</p></div>';
+    return;
+  }
+  g.innerHTML = floors.map(fp => `
+    <div class="floor-card">
+      ${fp.image_url
+        ? `<img class="floor-img" src="${fp.image_url}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+           <div class="floor-img-placeholder" style="display:none">🗺️</div>`
+        : `<div class="floor-img-placeholder">🗺️</div>`}
+      <div class="floor-body">
+        <div class="floor-name">${fp.name}</div>
+        <div class="floor-meta">${fp.floor_label} · Floor ${fp.floor_number}</div>
+        <div class="floor-btns">
+          <a class="btn btn-primary btn-xs" href="/editor?fp=${fp.id}">✏️ Edit Pins</a>
+          <button class="btn btn-ghost btn-xs" onclick="switchTab('qr',document.querySelectorAll('.nav-item')[2])">⬛ QRs</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteFloor('${fp.id}')">🗑</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function previewImg(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { const p = document.getElementById('fp-preview'); p.src = ev.target.result; p.style.display = 'block'; };
+  r.readAsDataURL(f);
+}
+
+async function uploadFloor() {
+  const name  = document.getElementById('fp-name').value.trim();
+  const label = document.getElementById('fp-label').value.trim();
+  const num   = document.getElementById('fp-num').value;
+  const file  = document.getElementById('fp-file').files[0];
+  if (!name || !file) return toast('Name and image are required');
+  const fd = new FormData();
+  fd.append('name', name); fd.append('floorLabel', label || name);
+  fd.append('floorNumber', num); fd.append('image', file);
+  try {
+    await apiForm('/floorplans/', fd);
+    closeModal('upload-modal');
+    toast('✅ Floor plan uploaded!');
+    ['fp-name','fp-label','fp-file'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fp-num').value = '0';
+    document.getElementById('fp-preview').style.display = 'none';
+    loadFloors();
+  } catch(e) { toast('Upload failed: ' + e.message); }
+}
+
+async function deleteFloor(id) {
+  if (!confirm('Delete this floor plan and all its markers?')) return;
+  try { await apiFetch('/floorplans/' + id, { method: 'DELETE' }); toast('Deleted'); loadFloors(); }
+  catch(e) { toast('Error: ' + e.message); }
+}
+
+// ── ENTRANCE GATE ────────────────────────────────────────────
+async function loadEntrance() {
+  try {
+    const gate = await apiFetch('/navigate/entrance?org_id=' + auth.orgId);
+    entranceGate = gate && gate.label ? gate : null;
+    renderEntranceInfo();
+    populateEntranceFloorDropdown();
+  } catch(e) { entranceGate = null; }
+}
+
+function renderEntranceInfo() {
+  const info    = document.getElementById('entrance-info');
+  const delBtn  = document.getElementById('del-entrance-btn');
+  if (entranceGate) {
+    info.innerHTML = `<strong>🚪 ${entranceGate.label}</strong><span>${entranceGate.floor_name} (${entranceGate.floor_label})</span>`;
+    delBtn.style.display = 'inline-flex';
+  } else {
+    info.innerHTML = `<strong>Not set yet</strong><span>Set an entrance gate so users know where to start</span>`;
+    delBtn.style.display = 'none';
+  }
+}
+
+function populateEntranceFloorDropdown() {
+  const sel = document.getElementById('ent-floor');
+  sel.innerHTML = floors.map(fp =>
+    `<option value="${fp.id}" data-label="${fp.floor_label}" data-name="${fp.name}">${fp.name} (${fp.floor_label})</option>`
+  ).join('');
+  if (entranceGate && entranceGate.floor_plan_id) sel.value = entranceGate.floor_plan_id;
+  if (entranceGate && entranceGate.label) document.getElementById('ent-label').value = entranceGate.label;
+}
+
+async function saveEntrance() {
+  const label   = document.getElementById('ent-label').value.trim() || 'Main Entrance';
+  const sel     = document.getElementById('ent-floor');
+  const opt     = sel.options[sel.selectedIndex];
+  const fp_id   = sel.value;
+  const fp_label= opt ? opt.dataset.label : 'G';
+  const fp_name = opt ? opt.dataset.name  : 'Ground Floor';
+  try {
+    await apiFetch('/navigate/entrance', {
+      method: 'POST',
+      body: JSON.stringify({ label, floor_plan_id: fp_id, floor_label: fp_label, floor_name: fp_name, x_pct: 50, y_pct: 95 })
+    });
+    toast('✅ Entrance gate saved!');
+    closeModal('entrance-modal');
+    loadEntrance();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteEntrance() {
+  if (!confirm('Remove entrance gate?')) return;
+  try {
+    await apiFetch('/navigate/entrance', { method: 'DELETE' });
+    toast('Entrance removed'); loadEntrance();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ── MARKERS ─────────────────────────────────────────────────
+async function loadMarkers() {
+  try {
+    allMarkers = await apiFetch('/markers/org/' + auth.orgId);
+    const tb = document.getElementById('markers-tbody');
+    if (!allMarkers.length) {
+      tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:28px">No markers yet</td></tr>';
+      return;
+    }
+    tb.innerHTML = allMarkers.map(m => `
+      <tr>
+        <td>${m.icon || '📍'} ${m.label}</td>
+        <td><span class="badge bg-blue">${m.floor_label || '—'}</span></td>
+        <td>${m.category || '—'}</td>
+        <td><span class="badge bg-green">${m.scan_count || 0}</span></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-xs" onclick="viewQR('${m.id}','${m.label.replace(/'/g,"\\'")}')">⬛ QR</button>
+          <button class="btn btn-danger btn-xs" onclick="delMarker('${m.id}')">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function delMarker(id) {
+  if (!confirm('Delete this marker?')) return;
+  try { await apiFetch('/markers/' + id, { method: 'DELETE' }); toast('Deleted'); loadMarkers(); }
+  catch(e) { toast('Error: ' + e.message); }
+}
+
+// ── QR CODES ────────────────────────────────────────────────
+async function loadQR() {
+  const g = document.getElementById('qr-grid');
+  g.innerHTML = '<div style="color:var(--text2);padding:20px">Loading QR codes…</div>';
+  try {
+    const data = await apiFetch('/qr/all');
+    if (!data.length) {
+      g.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="ei">⬛</div><h3>No markers yet</h3><p>Add room pins to generate QR codes.</p></div>';
+      return;
+    }
+    g.innerHTML = data.map(d => `
+      <div class="qr-card">
+        <div class="qr-img-box"><img src="${d.qr_code}" alt="QR"/></div>
+        <div class="qr-name">${d.label}</div>
+        <div class="qr-floor">${d.floor_label} · ${d.floor_name}</div>
+        <div class="qr-btns">
+          <button class="btn btn-ghost btn-xs" onclick="openQRModal('${d.marker_id}','${d.label.replace(/'/g,"\\'")}','${d.qr_code}','${d.url}')">View</button>
+          <a href="/api/qr/marker/${d.marker_id}/download" class="btn btn-primary btn-xs" style="text-decoration:none">⬇ PNG</a>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { toast('Error: ' + e.message); g.innerHTML = ''; }
+}
+
+function viewQR(id, label) {
+  apiFetch('/qr/marker/' + id)
+    .then(d => openQRModal(id, label, d.qr_code, d.url))
+    .catch(e => toast('Error: ' + e.message));
+}
+
+function openQRModal(id, label, src, url) {
+  document.getElementById('qr-modal-title').textContent = '⬛ ' + label;
+  document.getElementById('qr-modal-img').src = src;
+  document.getElementById('qr-modal-url').textContent = url;
+  document.getElementById('qr-dl-btn').href = '/api/qr/marker/' + id + '/download';
+  openModal('qr-modal');
+}
+
+// ── ANALYTICS ───────────────────────────────────────────────
+async function loadAnalytics() {
+  try {
+    const d = await apiFetch('/analytics/');
+    document.getElementById('s-scans').textContent   = d.total_scans;
+    document.getElementById('s-today').textContent   = d.today_scans;
+    document.getElementById('s-markers').textContent = d.total_markers;
+    document.getElementById('s-floors').textContent  = d.total_floors;
+    const max = Math.max(...d.daily_data.map(x => x.scans), 1);
+    document.getElementById('daily-bars').innerHTML = d.daily_data.map(x =>
+      `<div class="d-bar" style="height:${Math.round((x.scans/max)*66)+4}px" title="${x.date}: ${x.scans} scans"></div>`
+    ).join('');
+    renderBarChart('chart-scanned', d.top_scanned, 'scan_count');
+    renderBarChart('chart-dest',    d.top_dest,    'dest_count');
+    const rl = document.getElementById('recent-logs');
+    if (!d.recent_logs.length) { rl.innerHTML = '<div style="color:var(--text2);font-size:.83rem;padding:8px 0">No scans yet.</div>'; return; }
+    rl.innerHTML = d.recent_logs.map(l => `
+      <div class="log-row">
+        <span class="log-time">${new Date(l.scanned_at).toLocaleString()}</span>
+        <span class="badge bg-blue">${l.marker_label}</span>
+        <span style="color:var(--text3)">→</span>
+        <span class="badge bg-amber">${l.dest_label}</span>
+      </div>
+    `).join('');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function renderBarChart(elId, items, key) {
+  const el  = document.getElementById(elId);
+  const max = Math.max(...items.map(m => m[key] || 0), 1);
+  if (!items.length || max === 0) { el.innerHTML = '<div style="color:var(--text2);font-size:.8rem;padding:8px">No data yet</div>'; return; }
+  el.innerHTML = items.map(m => `
+    <div class="bar-row">
+      <span class="bar-lbl">${m.icon || ''} ${m.label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(((m[key]||0)/max)*100)}%">${m[key]||0}</div></div>
+    </div>
+  `).join('');
+}
+
+function logout() { clearAuth(); window.location.href = '/'; }
+loadFloors();
+</script>
+</body>
+</html>

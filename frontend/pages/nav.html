@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Navigate – NavMap</title>
+<link rel="stylesheet" href="/css/main.css"/>
+<style>
+body{overflow-x:hidden;background:var(--bg)}
+/* Header */
+.nav-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;background:var(--card);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:50;
+}
+.nav-hdr-org{font-size:.8rem;color:var(--text2)}
+/* Selector */
+.selector{
+  background:linear-gradient(135deg,rgba(200,241,53,.04),rgba(34,211,238,.03));
+  border-bottom:1px solid var(--border);padding:18px 20px;
+}
+.selector-title{
+  font-size:1rem;font-weight:800;margin-bottom:14px;letter-spacing:-.02em;
+  display:flex;align-items:center;gap:8px;
+}
+.selector-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.sel-grp{flex:1;min-width:200px}
+.sel-lbl{
+  font-size:.68rem;font-weight:700;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;
+  display:flex;align-items:center;gap:7px;
+}
+.qr-tag{
+  background:rgba(34,211,238,.12);color:var(--cyan);
+  font-size:.62rem;padding:1px 8px;border-radius:100px;font-weight:700;
+}
+.sel-grp select{
+  width:100%;padding:10px 36px 10px 14px;background:var(--bg3);
+  border:1px solid var(--border2);color:var(--text);border-radius:var(--radius2);
+  font-family:'Bricolage Grotesque',sans-serif;font-size:.86rem;
+  appearance:none;cursor:pointer;transition:border .2s;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a8099' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 13px center;
+}
+.sel-grp select:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px rgba(200,241,53,.1)}
+.sel-grp select option{background:var(--bg3)}
+.sel-grp select.pre{border-color:var(--cyan);background-color:rgba(34,211,238,.05)}
+/* Floor tabs */
+.floor-tabs{
+  display:flex;gap:6px;padding:12px 20px;
+  background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;
+}
+.ftab{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  padding:6px 14px;border-radius:var(--radius2);cursor:pointer;
+  font-size:.78rem;font-weight:600;white-space:nowrap;
+  transition:all .18s;font-family:'Bricolage Grotesque',sans-serif;
+}
+.ftab.active{background:var(--lime);color:#080b12;border-color:var(--lime)}
+/* Map */
+.map-frame{
+  position:relative;margin:14px 20px;border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--border);background:#080b12;
+  display:flex;align-items:center;justify-content:center;max-height:52vh;
+}
+.map-frame img{max-width:100%;max-height:52vh;object-fit:contain;display:block;user-select:none;pointer-events:none}
+.no-map{
+  width:100%;min-height:180px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:var(--text2);gap:8px;font-size:.84rem;
+}
+.no-map .ni{font-size:2.5rem;opacity:.5}
+/* Pins */
+.map-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:20;pointer-events:all}
+.p-dot{
+  width:28px;height:28px;border-radius:50% 50% 50% 0;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 12px rgba(0,0,0,.6);border:2.5px solid #fff;
+  transform:rotate(-45deg);transition:transform .15s;
+}
+.map-pin:hover .p-dot{transform:rotate(-45deg) scale(1.2)}
+.p-dot span{transform:rotate(45deg);display:block;font-size:11px}
+.p-tag{
+  background:rgba(8,11,18,.88);color:#fff;padding:2px 7px;
+  border-radius:5px;font-size:8.5px;white-space:nowrap;
+  position:absolute;top:-24px;left:50%;transform:translateX(-50%);
+  border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(4px);
+}
+.pin-you .p-dot{background:var(--cyan)!important}
+.pin-you{animation:youPulse 2s ease-in-out infinite}
+@keyframes youPulse{0%,100%{filter:drop-shadow(0 0 6px rgba(34,211,238,.5))}50%{filter:drop-shadow(0 0 12px rgba(34,211,238,.8))}}
+.pin-dest .p-dot{background:var(--rose)!important}
+.pin-entrance .p-dot{background:var(--amber)!important}
+/* Route SVG */
+.route-svg{position:absolute;inset:0;pointer-events:none;z-index:10;width:100%;height:100%;overflow:visible}
+/* Route panel */
+.route-panel{
+  margin:0 20px 14px;background:var(--card);
+  border:1px solid rgba(200,241,53,.25);border-radius:var(--radius);
+  padding:18px 20px;display:none;
+  box-shadow:0 4px 20px rgba(200,241,53,.06);
+}
+.route-panel.show{display:block;animation:fadeUp .2s ease}
+@keyframes fadeUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.route-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.route-title{font-weight:800;font-size:.95rem;letter-spacing:-.01em}
+.route-steps{display:flex;flex-direction:column;gap:5px}
+.step-item{
+  display:flex;align-items:flex-start;gap:9px;padding:8px 12px;
+  background:var(--bg3);border-radius:var(--radius2);font-size:.8rem;
+  color:var(--text2);line-height:1.45;border:1px solid var(--border);
+}
+.step-n{
+  background:var(--lime);color:#080b12;width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.68rem;font-weight:800;flex-shrink:0;margin-top:1px;
+}
+.diff-warn{
+  margin:0 20px 10px;background:rgba(251,191,36,.08);
+  border:1px solid rgba(251,191,36,.2);color:var(--amber);
+  border-radius:var(--radius2);padding:9px 14px;font-size:.78rem;display:none;
+}
+/* All locations */
+.all-locs{padding:14px 20px 40px}
+.all-locs-title{font-weight:700;font-size:.9rem;margin-bottom:10px;letter-spacing:-.01em}
+.loc-chips{display:flex;flex-wrap:wrap;gap:7px}
+.loc-chip{
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);
+  padding:7px 13px;font-size:.78rem;cursor:pointer;transition:all .18s;
+  display:flex;align-items:center;gap:5px;
+}
+.loc-chip:hover{border-color:var(--lime);color:var(--lime);background:rgba(200,241,53,.06)}
+.loc-chip small{color:var(--text3);font-size:.68rem}
+.chip-entrance{border-color:rgba(251,191,36,.25);background:rgba(251,191,36,.04)}
+.chip-entrance:hover{border-color:var(--amber);color:var(--amber)}
+/* Loading */
+.loading{
+  position:fixed;inset:0;background:var(--bg);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:200;
+}
+.spinner{
+  width:38px;height:38px;border:3px solid var(--bg4);
+  border-top-color:var(--lime);border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:600px){.selector-row{flex-direction:column}.sel-grp{min-width:100%}}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--text2);font-size:.85rem;letter-spacing:.02em">Loading map…</p>
+</div>
+<div class="nav-hdr">
+  <div class="logo" style="cursor:default"><div class="logo-mark">N</div> NavMap</div>
+  <div class="nav-hdr-org" id="nav-org">…</div>
+</div>
+<div class="selector">
+  <div class="selector-title">🧭 Find Your Way</div>
+  <div class="selector-row">
+    <div class="sel-grp">
+      <div class="sel-lbl">
+        📍 I am at
+        <span class="qr-tag" id="qr-badge" style="display:none">📷 QR Scanned</span>
+      </div>
+      <select id="from-sel" onchange="onFromChange()">
+        <option value="">— Select your current location —</option>
+      </select>
+    </div>
+    <div class="sel-grp">
+      <div class="sel-lbl">🎯 I want to go to</div>
+      <select id="to-sel" onchange="renderPins()">
+        <option value="">— Select destination —</option>
+      </select>
+    </div>
+    <div style="flex-shrink:0;align-self:flex-end">
+      <button class="btn btn-primary" onclick="showRoute()">Show Route →</button>
+    </div>
+  </div>
+</div>
+<div class="floor-tabs" id="floor-tabs"></div>
+<div class="map-frame" id="map-frame">
+  <div class="no-map" id="no-map"><div class="ni">🗺️</div><p>Select a location to see the map</p></div>
+  <img id="map-img" src="" style="display:none" onload="onImgLoad()"/>
+  <svg class="route-svg" id="route-svg"></svg>
+  <div id="pins-layer" style="position:absolute;inset:0;pointer-events:none"></div>
+</div>
+<div class="diff-warn" id="diff-warn">⚠️ Destination is on a different floor — follow the steps below</div>
+<div class="route-panel" id="route-panel">
+  <div class="route-hdr"><span style="font-size:1.3rem">🗺️</span><div class="route-title" id="route-title">Route</div></div>
+  <div class="route-steps" id="route-steps"></div>
+</div>
+<div class="all-locs">
+  <div class="all-locs-title">All Locations</div>
+  <div class="loc-chips" id="loc-chips"></div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/js/utils.js"></script>
+<script>
+let navData=null,currentFloorId=null;
+const params=new URLSearchParams(window.location.search);
+const ORG_ID=params.get('org')||'';
+const ROOM_ID=params.get('room')||'';
+
+async function init(){
+  if(!ORG_ID){showErr2('Invalid QR — no organization found');return;}
+  try{
+    const ep=ROOM_ID?`/api/navigate/room/${ROOM_ID}`:`/api/navigate/org/${ORG_ID}`;
+    const res=await fetch(ep);
+    if(!res.ok)throw new Error('Organization not found');
+    navData=await res.json();
+    document.getElementById('nav-org').textContent=navData.org?navData.org.name:'';
+    document.title=(navData.org?navData.org.name:'NavMap')+' – Navigate';
+    fetch('/api/analytics/scan',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({org_id:ORG_ID,marker_id:ROOM_ID,dest_id:''})}).catch(()=>{});
+    buildSelectors();buildFloorTabs();buildLocChips();
+    if(ROOM_ID){
+      document.getElementById('from-sel').value=ROOM_ID;
+      document.getElementById('from-sel').classList.add('pre');
+      document.getElementById('qr-badge').style.display='inline';
+      onFromChange(true);
+    } else {
+      const fps=sortedFloors();if(fps.length)switchFloor(fps[0].id);
+    }
+    document.getElementById('loading').style.display='none';
+  }catch(e){showErr2(e.message);}
+}
+
+function showErr2(msg){
+  document.getElementById('loading').innerHTML=`
+    <div style="text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:12px">❌</div>
+      <h3 style="font-weight:800;margin-bottom:6px">Map not found</h3>
+      <p style="color:var(--text2);font-size:.84rem">${msg}</p>
+    </div>`;
+}
+
+function sortedFloors(){return(navData.floor_plans||[]).sort((a,b)=>a.floor_number-b.floor_number)}
+function allMarkers(){return navData.all_markers||navData.markers||[]}
+function getMarker(id){
+  if(!id)return null;
+  if(id==='entrance')return navData.entrance_gate||null;
+  return allMarkers().find(m=>m.id===id)||null;
+}
+function floorMarkers(fpId){return allMarkers().filter(m=>m.floor_plan_id===fpId)}
+
+function buildSelectors(){
+  const f=document.getElementById('from-sel'),t=document.getElementById('to-sel');
+  f.innerHTML='<option value="">— Select your current location —</option>';
+  t.innerHTML='<option value="">— Select destination —</option>';
+  const eg=navData.entrance_gate;
+  if(eg&&eg.label){
+    f.appendChild(new Option(`🚪 ${eg.label} (Entrance)`,'entrance'));
+    t.appendChild(new Option(`🚪 ${eg.label} (Entrance)`,'entrance'));
+  }
+  sortedFloors().forEach(fp=>{
+    const fm=floorMarkers(fp.id);if(!fm.length)return;
+    const g1=document.createElement('optgroup'),g2=document.createElement('optgroup');
+    g1.label=g2.label=`${fp.name} — ${fp.floor_label}`;
+    fm.forEach(m=>{g1.appendChild(new Option(`${m.icon||'📍'} ${m.label}`,m.id));g2.appendChild(new Option(`${m.icon||'📍'} ${m.label}`,m.id));});
+    f.appendChild(g1);t.appendChild(g2);
+  });
+}
+
+function buildFloorTabs(){
+  const tabs=document.getElementById('floor-tabs');
+  tabs.innerHTML=sortedFloors().map(fp=>`<button class="ftab" id="ftab-${fp.id}" onclick="switchFloor('${fp.id}')">${fp.floor_label} — ${fp.name}</button>`).join('');
+}
+
+function switchFloor(fpId){
+  currentFloorId=fpId;
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
+  const tab=document.getElementById('ftab-'+fpId);if(tab)tab.classList.add('active');
+  const fp=sortedFloors().find(f=>f.id===fpId);
+  const img=document.getElementById('map-img');
+  if(fp&&fp.image_url){img.src=fp.image_url;img.style.display='block';document.getElementById('no-map').style.display='none';}
+  else{img.style.display='none';document.getElementById('no-map').style.display='flex';renderPins();}
+}
+function onImgLoad(){renderPins();drawRoute();}
+
+function onFromChange(initial){
+  const id=document.getElementById('from-sel').value;
+  if(!initial){document.getElementById('from-sel').classList.remove('pre');document.getElementById('qr-badge').style.display='none';}
+  if(!id)return;
+  const m=id==='entrance'?navData.entrance_gate:getMarker(id);
+  if(m&&m.floor_plan_id)switchFloor(m.floor_plan_id);
+  hideRoute();renderPins();
+}
+
+const CAT={Classroom:'#c8f135',Laboratory:'#22d3ee',Department:'#fbbf24',Office:'#a78bfa',
+  Facility:'#fb7185',Washroom:'#94a3b8',Canteen:'#fb923c',Library:'#8b5cf6',Emergency:'#ef4444',Other:'#34d399'};
+
+function renderPins(){
+  if(!currentFloorId)return;
+  const layer=document.getElementById('pins-layer');
+  const fromId=document.getElementById('from-sel').value;
+  const toId=document.getElementById('to-sel').value;
+  const markers=floorMarkers(currentFloorId);
+  const eg=navData.entrance_gate;
+  let html='';
+  if(eg&&eg.label&&eg.floor_plan_id===currentFloorId){
+    const iF=fromId==='entrance',iT=toId==='entrance';
+    const cls=iF?'map-pin pin-you':iT?'map-pin pin-dest':'map-pin pin-entrance';
+    const bg=iF?'var(--cyan)':iT?'var(--rose)':'var(--amber)';
+    html+=`<div class="${cls}" style="left:${eg.x_pct||50}%;top:${eg.y_pct||95}%;pointer-events:all" onclick="pinClick('entrance')">
+      <div class="p-tag">🚪 ${eg.label}</div>
+      <div class="p-dot" style="background:${bg}"><span>🚪</span></div></div>`;
+  }
+  markers.forEach(m=>{
+    const iF=m.id===fromId,iT=m.id===toId;
+    const bg=iF?'var(--cyan)':iT?'var(--rose)':(CAT[m.category]||'#c8f135');
+    const cls=iF?'map-pin pin-you':iT?'map-pin pin-dest':'map-pin';
+    html+=`<div class="${cls}" style="left:${m.x_pct}%;top:${m.y_pct}%;pointer-events:all" onclick="pinClick('${m.id}')">
+      <div class="p-tag">${m.label}</div>
+      <div class="p-dot" style="background:${bg}"><span>${m.icon||'📍'}</span></div></div>`;
+  });
+  layer.innerHTML=html;
+  drawRoute();
+}
+
+function pinClick(id){
+  const t=document.getElementById('to-sel'),f=document.getElementById('from-sel');
+  if(id===f.value)return;
+  t.value=id;renderPins();
+}
+
+function drawRoute(){
+  const svg=document.getElementById('route-svg');
+  const fromId=document.getElementById('from-sel').value;
+  const toId=document.getElementById('to-sel').value;
+  if(!fromId||!toId||!currentFloorId){svg.innerHTML='';return;}
+  const from=getMarker(fromId),to=getMarker(toId);
+  if(!from||!to){svg.innerHTML='';return;}
+  if(from.floor_plan_id!==currentFloorId||to.floor_plan_id!==currentFloorId){svg.innerHTML='';return;}
+  const img=document.getElementById('map-img');
+  const rect=img.getBoundingClientRect();
+  const frame=document.getElementById('map-frame').getBoundingClientRect();
+  if(!rect.width){svg.innerHTML='';return;}
+  const x1=((from.x_pct/100)*rect.width)+(rect.left-frame.left);
+  const y1=((from.y_pct/100)*rect.height)+(rect.top-frame.top);
+  const x2=((to.x_pct/100)*rect.width)+(rect.left-frame.left);
+  const y2=((to.y_pct/100)*rect.height)+(rect.top-frame.top);
+  svg.setAttribute('viewBox',`0 0 ${frame.width} ${frame.height}`);
+  svg.innerHTML=`
+    <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#c8f135" opacity=".9"/></marker></defs>
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="#c8f135" stroke-width="2.5" stroke-dasharray="10,6" opacity=".8" marker-end="url(#arr)"/>
+    <circle cx="${x1}" cy="${y1}" r="5" fill="var(--cyan)" stroke="#080b12" stroke-width="2"/>
+    <circle cx="${x2}" cy="${y2}" r="5" fill="var(--rose)" stroke="#080b12" stroke-width="2"/>`;
+}
+
+function showRoute(){
+  const fromId=document.getElementById('from-sel').value;
+  const toId=document.getElementById('to-sel').value;
+  if(!fromId)return toast('Please select where you are');
+  if(!toId)return toast('Please select your destination');
+  if(fromId===toId)return toast('You are already there! 🎉');
+  const from=getMarker(fromId),to=getMarker(toId);
+  if(!from||!to)return;
+  fetch('/api/analytics/scan',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({org_id:ORG_ID,marker_id:fromId,dest_id:toId})}).catch(()=>{});
+  const diffFloor=from.floor_plan_id!==to.floor_plan_id;
+  const fromFP=sortedFloors().find(f=>f.id===from.floor_plan_id);
+  const toFP=sortedFloors().find(f=>f.id===to.floor_plan_id);
+  switchFloor(to.floor_plan_id);
+  document.getElementById('diff-warn').style.display=diffFloor?'block':'none';
+  const fLbl=fromId==='entrance'?`🚪 ${from.label}`:`${from.icon||'📍'} ${from.label}`;
+  const tLbl=toId==='entrance'?`🚪 ${to.label}`:`${to.icon||'📍'} ${to.label}`;
+  document.getElementById('route-title').textContent=`${fLbl}  →  ${tLbl}`;
+  const steps=buildSteps(from,to,fromFP,toFP,diffFloor,fLbl,tLbl);
+  document.getElementById('route-steps').innerHTML=steps.map((s,i)=>`
+    <div class="step-item"><div class="step-n">${i+1}</div><span>${s}</span></div>`).join('');
+  document.getElementById('route-panel').classList.add('show');
+  document.getElementById('route-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  renderPins();
+}
+
+function buildSteps(from,to,fromFP,toFP,diffFloor,fLbl,tLbl){
+  const s=[];
+  s.push(`Start at <strong>${fLbl}</strong>`);
+  if(diffFloor&&fromFP&&toFP){
+    const up=(toFP.floor_number||0)>(fromFP.floor_number||0);
+    s.push(`Take stairs/lift <strong>${up?'UP ↑':'DOWN ↓'}</strong> to <strong>${toFP.floor_label} — ${toFP.name}</strong>`);
+  }
+  const dx=(to.x_pct||50)-(from.x_pct||50);
+  const dy=(to.y_pct||50)-(from.y_pct||50);
+  s.push(Math.abs(dx)>Math.abs(dy)
+    ?`Head <strong>${dx>0?'→ Right':'← Left'}</strong> along the corridor`
+    :`Head <strong>${dy>0?'↓ Forward':'↑ Backward'}</strong> along the corridor`);
+  const dist=Math.round(Math.sqrt(dx*dx+dy*dy));
+  if(dist>25)s.push(`Continue approximately <strong>${Math.round(dist*0.5)} meters</strong>`);
+  s.push(`Look for <strong>${tLbl}</strong> signboard`);
+  s.push(`✅ You have arrived at <strong>${to.label}</strong>`);
+  return s;
+}
+
+function hideRoute(){
+  document.getElementById('route-panel').classList.remove('show');
+  document.getElementById('diff-warn').style.display='none';
+  document.getElementById('route-svg').innerHTML='';
+}
+
+function buildLocChips(){
+  const chips=document.getElementById('loc-chips');
+  let html='';
+  const eg=navData.entrance_gate;
+  if(eg&&eg.label)html+=`<div class="loc-chip chip-entrance" onclick="setDest('entrance')">🚪 ${eg.label} <small>Entrance</small></div>`;
+  allMarkers().forEach(m=>{html+=`<div class="loc-chip" onclick="setDest('${m.id}')">${m.icon||'📍'} ${m.label} <small>${m.floor_label||''}</small></div>`;});
+  chips.innerHTML=html;
+}
+
+function setDest(id){
+  document.getElementById('to-sel').value=id;
+  const m=id==='entrance'?navData.entrance_gate:getMarker(id);
+  if(m&&m.floor_plan_id)switchFloor(m.floor_plan_id);
+  renderPins();window.scrollTo({top:0,behavior:'smooth'});
+}
+
+init();
+</script>
+</body>
+</html>
